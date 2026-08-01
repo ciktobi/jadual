@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jadual Kerja - SBH330</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        
+        /* Custom scrollbar for table */
+        .table-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        /* Sticky columns configuration */
+        .sticky-col {
+            position: sticky;
+            background-color: white;
+            z-index: 10;
+        }
+        /* Fixed widths to match left offsets perfectly */
+        .sticky-col-1 { left: 0; min-width: 60px; max-width: 60px; }
+        .sticky-col-2 { left: 60px; min-width: 110px; max-width: 110px; }
+        .sticky-col-3 { left: 170px; min-width: 200px; max-width: 200px; }
+        .sticky-col-4 { left: 370px; min-width: 100px; max-width: 100px; }
+
+        thead .sticky-col {
+            background-color: #f8fafc;
+            z-index: 20;
+        }
+
+        /* Print Styles */
+        @media print {
+            body { background-color: white; }
+            .no-print { display: none !important; }
+            .table-container { overflow: visible !important; }
+            table { border-collapse: collapse; width: 100%; font-size: 8px;}
+            th, td { border: 1px solid #000; padding: 2px !important; }
+            .sticky-col { position: static; min-width: auto; max-width: auto;}
+            
+            /* Add this to hide the 'Tambah Staf' row during print */
+            #addStaffRow { display: none !important; }
+            
+            /* Remove borders from inputs for cleaner printing */
+            input[type="text"] { border: none !important; background: transparent !important; }
+        }
+        
+        /* Add some styling for inline editing inputs */
+        .editable-input {
+            width: 100%;
+            height: 100%;
+            border: 1px solid transparent;
+            background: transparent;
+            padding: 4px;
+            font-size: inherit;
+            font-family: inherit;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        
+        .editable-input:focus {
+            border-color: #3b82f6;
+            background-color: #fff;
+            border-radius: 4px;
+            box-shadow: 0 0 0 1px #3b82f6;
+        }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col">
+
+    <header class="bg-white shadow-sm px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 no-print shrink-0">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Jadual Kerja SBH330</h1>
+            <p class="text-sm text-gray-500">Bulan: Ogos 2026 | Cawangan: Dispacther</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <input type="text" id="searchInput" placeholder="Cari Nama Staf..." class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex-grow md:flex-grow-0">
+            <button onclick="addNewStaff()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+                Tambah Staf
+            </button>
+            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Cetak / PDF
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow p-4 md:p-6 overflow-hidden flex flex-col gap-4">
+        <!-- Table Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-grow flex flex-col relative">
+            <div class="table-container overflow-x-auto overflow-y-auto flex-grow relative">
+                <table class="w-full text-sm text-left whitespace-nowrap" id="scheduleTable">
+                    <thead class="text-xs text-gray-700 uppercase bg-slate-50 sticky top-0 z-30 shadow-sm border-b">
+                        <tr id="headerRow1">
+                            <!-- Headers dynamically injected here -->
+                        </tr>
+                        <tr id="headerRow2" class="text-[10px] text-gray-500 border-b">
+                            <!-- Days dynamically injected here -->
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-gray-200">
+                        <!-- Rows injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 no-print shrink-0">
+            <h3 class="text-sm font-bold mb-3 text-gray-700 uppercase tracking-wider">Petunjuk (Legend) & Editor</h3>
+            <p class="text-xs text-gray-500 mb-3">Klik pada mana-mana sel masa dalam jadual untuk menukar shift/status.</p>
+            <div class="flex flex-wrap gap-2 text-xs">
+                <div class="flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-1 rounded"><span class="w-3 h-3 rounded-full bg-blue-500"></span> 0700-1600 (JAM 7)</div>
+                <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> 0500-1400 (JAM 5)</div>
+                <div class="flex items-center gap-1 bg-teal-50 border border-teal-200 px-2 py-1 rounded"><span class="w-3 h-3 rounded-full bg-teal-500"></span> 0800-1700 (JAM 8)</div>
+                <div class="flex items-center gap-1 bg-cyan-50 border border-cyan-200 px-2 py-1 rounded"><span class="w-3 h-3 rounded-full bg-cyan-500"></span> 0900-1800 (JAM 9)</div>
+                <div class="flex items-center gap-1 bg-gray-100 border border-gray-300 px-2 py-1 rounded text-gray-700 font-semibold"><span class="w-3 h-3 rounded-full bg-gray-400"></span> REST</div>
+                <div class="flex items-center gap-1 bg-yellow-100 border border-yellow-300 px-2 py-1 rounded text-yellow-800 font-semibold"><span class="w-3 h-3 rounded-full bg-yellow-500"></span> UPL</div>
+                <div class="flex items-center gap-1 bg-orange-100 border border-orange-300 px-2 py-1 rounded text-orange-800 font-semibold"><span class="w-3 h-3 rounded-full bg-orange-500"></span> ROD</div>
+                <div class="flex items-center gap-1 bg-red-100 border border-red-300 px-2 py-1 rounded text-red-800 font-semibold"><span class="w-3 h-3 rounded-full bg-red-600"></span> ABSENT</div>
+                <div class="flex items-center gap-1 bg-pink-100 border border-pink-300 px-2 py-1 rounded text-pink-800 font-semibold"><span class="w-3 h-3 rounded-full bg-pink-500"></span> MC</div>
+                <div class="flex items-center gap-1 bg-purple-100 border border-purple-300 px-2 py-1 rounded text-purple-800 font-semibold"><span class="w-3 h-3 rounded-full bg-purple-500"></span> PH</div>
+            </div>
+        </div>
+    </main>
+
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center no-print">
+        <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm m-4 transform transition-all">
+            <h3 class="text-lg font-bold mb-1 text-gray-900">Kemaskini Jadual</h3>
+            <p id="modalContext" class="text-xs text-gray-500 mb-4"></p>
+
+            <div class="grid grid-cols-2 gap-2 mb-4">
+                <button onclick="updateCell('0700-1600')" class="py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm rounded-lg border border-blue-200 transition">0700-1600</button>
+                <button onclick="updateCell('0500-1400')" class="py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm rounded-lg border border-emerald-200 transition">0500-1400</button>
+                <button onclick="updateCell('0800-1700')" class="py-2 px-3 bg-teal-50 hover:bg-teal-100 text-teal-700 text-sm rounded-lg border border-teal-200 transition">0800-1700</button>
+                <button onclick="updateCell('0900-1800')" class="py-2 px-3 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 text-sm rounded-lg border border-cyan-200 transition">0900-1800</button>
+                <button onclick="updateCell('REST')" class="py-2 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-sm rounded-lg border border-gray-300 transition">REST</button>
+                <button onclick="updateCell('MC')" class="py-2 px-3 bg-pink-100 hover:bg-pink-200 text-pink-800 font-bold text-sm rounded-lg border border-pink-300 transition">MC</button>
+                <button onclick="updateCell('ABSENT')" class="py-2 px-3 bg-red-100 hover:bg-red-200 text-red-800 font-bold text-sm rounded-lg border border-red-300 transition">ABSENT</button>
+                <button onclick="updateCell('PH')" class="py-2 px-3 bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-sm rounded-lg border border-purple-300 transition">PH</button>
+                <button onclick="updateCell('UPL')" class="py-2 px-3 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-bold text-sm rounded-lg border border-yellow-300 transition">UPL</button>
+                <button onclick="updateCell('ROD')" class="py-2 px-3 bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold text-sm rounded-lg border border-orange-300 transition">ROD</button>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-2">
+                <button onclick="closeModal()" class="px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium transition">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const DAYS_IN_MONTH = 31;
+        const START_DAY_INDEX = 6; // 1st Aug 2026 is Saturday (0=Sun, 1=Mon... 6=Sat)
+        const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+        
+        // Raw Staff Data (Parsed from prompt)
+        const rawStaffData = [
+            ["I01", "SBH3300007", "MOHAMMADIN", "CONTRACK"],
+            ["I02", "SBH3300003", "SAIM", "CONTRACK"],
+            ["I02", "SBH3300165", "SITI SYARNILAHMALA", "PARTIME"],
+            ["I03", "SBH3300087", "KU AIMAN", "PARTIME"],
+            ["I04", "SBH3300008", "ADZWAN BIN BOMAN", "CONTRACK"],
+            ["I04", "SBH330168", "ASNORIMAN", "PARTIME"],
+            ["I05", "SBH3300006", "SUMARNI BINTI SIRAJUDDIN", "CONTRACK"],
+            ["I06", "SBH3300085", "AMRAN", "PARTIME"],
+            ["I07", "SBH3300113", "SHAFIQ NULFIKRI", "PARTIME"],
+            ["I07", "SBH3300157", "HANIF", "PARTIME"],
+            ["I08", "SBH3300005", "JAMALUDIN", "CONTRACK"],
+            ["I09", "SBH3300076", "YUSRANG", "CONTRACK"],
+            ["I10", "SBH3300010", "MOHD BASRIE BIN HAIRI", "CONTRACK"],
+            ["I11", "SBH3300009", "ABDULLAH BIN ABDUL BASIR", "CONTRACK"],
+            ["I12", "SBH3300300", "SUDIRMAN", "PARTIME"],
+            ["I13", "SBH3300134", "PUTRA", "PARTIME"],
+            ["I14", "SBH3300193", "RIDZUAN", "PARTIME"],
+            ["I15", "SBH3302004", "MIJAN", "PARTIME"],
+            ["B01", "SBH3302003", "AZZAT", "PARTIME"],
+            ["B02", "SBH3300114", "AL SHUKRI", "PARTIME"],
+            ["M01", "SBH3300014", "ABDULLAH", "CONTRACK"],
+            ["M02", "SBH3300013", "FAIZAL BIN ABDULLAH", "CONTRACK"],
+            ["M03", "SBH3300157", "HANAFI", "PARTIME"],
+            ["M04", "SBH3300004", "MOHAMMAD AIMAL BIN AMLI", "CONTRACK"],
+            ["M04", "SBH3300141", "MOHD IRZAM AMAN", "PARTIME"],
+            ["M05", "SBH3300020", "MOHD SYAFIQ BIN ABDUL WAHAB", "CONTRACK"],
+            ["M06", "SBH3300112", "ROZITA", "PARTIME"]
+        ];
+
+        let staffSchedule = rawStaffData.map((staff, index) => {
+            let shifts = Array(DAYS_IN_MONTH).fill("0700-1600");
+            // To strict match prompt: default all to 0700-1600 initially.
+            return {
+                index: index,
+                code: staff[0],
+                id: staff[1],
+                name: staff[2],
+                type: staff[3],
+                shifts: shifts
+            };
+        });
+
+        // Current editing context
+        let currentEdit = { staffIndex: null, dayIndex: null };
+
+        function getStyleForShift(shift) {
+            switch(shift) {
+                case '0700-1600': return 'bg-blue-50 text-blue-700 font-medium';
+                case '0500-1400': return 'bg-emerald-50 text-emerald-700 font-medium';
+                case '0800-1700': return 'bg-teal-50 text-teal-700 font-medium';
+                case '0900-1800': return 'bg-cyan-50 text-cyan-700 font-medium';
+                case 'REST': return 'bg-gray-100 text-gray-600 font-bold';
+                case 'MC': return 'bg-pink-100 text-pink-700 font-bold';
+                case 'ABSENT': return 'bg-red-100 text-red-700 font-bold';
+                case 'PH': return 'bg-purple-100 text-purple-700 font-bold';
+                case 'UPL': return 'bg-yellow-100 text-yellow-700 font-bold';
+                case 'ROD': return 'bg-orange-100 text-orange-700 font-bold';
+                default: return 'bg-white text-gray-700';
+            }
+        }
+
+        function getDayName(dayIndexOfMonth) {
+            // dayIndexOfMonth is 0 to 30
+            let dayOfWeek = (START_DAY_INDEX + dayIndexOfMonth) % 7;
+            return DAYS[dayOfWeek];
+        }
+
+        function getDayColor(dayName) {
+            if(dayName === 'SUN' || dayName === 'SAT') return 'text-red-500 font-bold';
+            return 'text-gray-500';
+        }
+
+        function initializeTable() {
+            const h1 = document.getElementById('headerRow1');
+            const h2 = document.getElementById('headerRow2');
+            
+            // Build Sticky Headers
+            h1.innerHTML = `
+                <th scope="col" class="px-4 py-3 sticky-col sticky-col-1 border-r border-gray-200" rowspan="2">KOD</th>
+                <th scope="col" class="px-4 py-3 sticky-col sticky-col-2 border-r border-gray-200" rowspan="2">ID STAF</th>
+                <th scope="col" class="px-4 py-3 sticky-col sticky-col-3 border-r border-gray-200" rowspan="2">NAMA</th>
+                <th scope="col" class="px-4 py-3 sticky-col sticky-col-4 border-r border-gray-200" rowspan="2">STATUS</th>
+            `;
+            
+            // Build Date Headers
+            for(let i = 1; i <= DAYS_IN_MONTH; i++) {
+                let dName = getDayName(i-1);
+                let dateStr = `${i.toString().padStart(2, '0')}-Aug`;
+                h1.innerHTML += `<th scope="col" class="px-2 py-2 border-r border-gray-200 text-center min-w-[90px] border-b">${dateStr}</th>`;
+                h2.innerHTML += `<th scope="col" class="px-2 py-1 border-r border-gray-200 text-center ${getDayColor(dName)}">${dName}</th>`;
+            }
+
+            renderTable(staffSchedule);
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            data.forEach((staff) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-blue-50 transition-colors group';
+
+                // Sticky Columns with editable inputs
+                let html = `
+                    <td class="p-0 sticky-col sticky-col-1 border-r border-b border-gray-200 group-hover:bg-blue-50">
+                        <input type="text" value="${staff.code}" class="editable-input text-xs font-semibold text-center" onchange="updateStaffInfo(${staff.index}, 'code', this.value)" placeholder="KOD">
+                    </td>
+                    <td class="p-0 sticky-col sticky-col-2 border-r border-b border-gray-200 group-hover:bg-blue-50">
+                        <input type="text" value="${staff.id}" class="editable-input text-xs text-gray-500 text-center" onchange="updateStaffInfo(${staff.index}, 'id', this.value)" placeholder="ID STAF">
+                    </td>
+                    <td class="p-0 sticky-col sticky-col-3 border-r border-b border-gray-200 group-hover:bg-blue-50">
+                        <input type="text" value="${staff.name}" class="editable-input text-xs font-medium text-gray-900" onchange="updateStaffInfo(${staff.index}, 'name', this.value)" placeholder="NAMA STAF">
+                    </td>
+                    <td class="px-2 py-1 sticky-col sticky-col-4 border-r border-b border-gray-200 group-hover:bg-blue-50">
+                        <select class="editable-input text-[10px] font-semibold tracking-wider uppercase rounded-full ${staff.type === 'CONTRACK' ? 'bg-indigo-100 text-indigo-800' : 'bg-fuchsia-100 text-fuchsia-800'}" onchange="updateStaffInfo(${staff.index}, 'type', this.value)">
+                            <option value="CONTRACK" ${staff.type === 'CONTRACK' ? 'selected' : ''}>CONTRACK</option>
+                            <option value="PARTIME" ${staff.type === 'PARTIME' ? 'selected' : ''}>PARTIME</option>
+                        </select>
+                    </td>
+                `;
+
+                // Shift Columns
+                staff.shifts.forEach((shift, dayIndex) => {
+                    let dName = getDayName(dayIndex);
+                    let isWeekend = (dName === 'SAT' || dName === 'SUN') ? 'bg-gray-50' : '';
+                    let shiftClass = getStyleForShift(shift);
+                    
+                    html += `
+                        <td class="border-r border-b border-gray-200 p-1 text-center cursor-pointer transition-all ${isWeekend}" 
+                            onclick="openModal(${staff.index}, ${dayIndex})">
+                            <div class="w-full h-full min-h-[30px] flex items-center justify-center rounded-md text-[11px] hover:ring-2 hover:ring-blue-400 ${shiftClass}">
+                                ${shift}
+                            </div>
+                        </td>
+                    `;
+                });
+
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+            
+            const addRow = document.createElement('tr');
+            addRow.id = 'addStaffRow';
+            addRow.className = 'bg-green-50 border-t-2 border-green-200 no-print';
+            
+            let addRowHtml = `
+                <td class="p-1 sticky-col sticky-col-1 border-r border-b border-gray-200 bg-green-50">
+                    <input type="text" id="newStaffCode" placeholder="KOD" class="w-full px-2 py-1 text-xs border border-green-300 rounded focus:ring-green-500 focus:border-green-500 bg-white">
+                </td>
+                <td class="p-1 sticky-col sticky-col-2 border-r border-b border-gray-200 bg-green-50">
+                    <input type="text" id="newStaffId" placeholder="ID STAF" class="w-full px-2 py-1 text-xs border border-green-300 rounded focus:ring-green-500 focus:border-green-500 bg-white">
+                </td>
+                <td class="p-1 sticky-col sticky-col-3 border-r border-b border-gray-200 bg-green-50">
+                    <input type="text" id="newStaffName" placeholder="NAMA BARU" class="w-full px-2 py-1 text-xs border border-green-300 rounded focus:ring-green-500 focus:border-green-500 bg-white">
+                </td>
+                <td class="p-1 sticky-col sticky-col-4 border-r border-b border-gray-200 bg-green-50">
+                    <select id="newStaffType" class="w-full px-1 py-1 text-xs border border-green-300 rounded focus:ring-green-500 focus:border-green-500 bg-white">
+                        <option value="CONTRACK">CONTRACK</option>
+                        <option value="PARTIME">PARTIME</option>
+                    </select>
+                </td>
+                <td colspan="${DAYS_IN_MONTH}" class="px-4 py-2 border-b border-gray-200 text-left">
+                    <button onclick="saveNewStaff()" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded transition-colors shadow-sm">Simpan Staf Baru</button>
+                </td>
+            `;
+            addRow.innerHTML = addRowHtml;
+            tbody.appendChild(addRow);
+        }
+
+        function openModal(staffIndex, dayIndex) {
+            currentEdit = { staffIndex, dayIndex };
+            const staff = staffSchedule.find(s => s.index === staffIndex);
+            
+            document.getElementById('modalContext').innerText = 
+                `${staff.name} | ${dayIndex + 1} Ogos (${getDayName(dayIndex)})`;
+            
+            const modal = document.getElementById('editModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('editModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            currentEdit = { staffIndex: null, dayIndex: null };
+        }
+
+        function updateStaffInfo(staffIndex, field, value) {
+            let staffItem = staffSchedule.find(s => s.index === staffIndex);
+            if (staffItem) {
+                staffItem[field] = value.toUpperCase(); // Enforce uppercase
+                
+                // Optional: Re-render to update select colors if type changes
+                if(field === 'type') {
+                    // Re-apply filter if active, otherwise render all
+                    triggerRender();
+                }
+            }
+        }
+        
+        function addNewStaff() {
+            // Scroll to the bottom to see the add row
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
+            
+            // Focus on the first input
+            document.getElementById('newStaffCode').focus();
+        }
+        
+        function saveNewStaff() {
+            const code = document.getElementById('newStaffCode').value.trim().toUpperCase();
+            const id = document.getElementById('newStaffId').value.trim().toUpperCase();
+            const name = document.getElementById('newStaffName').value.trim().toUpperCase();
+            const type = document.getElementById('newStaffType').value;
+            
+            if (!name) {
+                alert("Sila masukkan sekurang-kurangnya nama staf.");
+                return;
+            }
+            
+            // Get highest existing index to assign a new unique index
+            const nextIndex = staffSchedule.length > 0 ? Math.max(...staffSchedule.map(s => s.index)) + 1 : 0;
+            
+            const newStaff = {
+                index: nextIndex,
+                code: code || "-",
+                id: id || "-",
+                name: name,
+                type: type,
+                shifts: Array(DAYS_IN_MONTH).fill("0700-1600") // Default shifts
+            };
+            
+            staffSchedule.push(newStaff);
+            
+            // Clear search filter so the new staff is visible
+            document.getElementById('searchInput').value = '';
+            
+            triggerRender();
+            
+            // Scroll down again just in case
+            setTimeout(() => {
+                const tableContainer = document.querySelector('.table-container');
+                tableContainer.scrollTop = tableContainer.scrollHeight;
+            }, 50);
+        }
+
+        function updateCell(newShift) {
+            if(currentEdit.staffIndex !== null && currentEdit.dayIndex !== null) {
+                // Find the specific object and update
+                let staffItem = staffSchedule.find(s => s.index === currentEdit.staffIndex);
+                staffItem.shifts[currentEdit.dayIndex] = newShift;
+                
+                triggerRender();
+                closeModal();
+            }
+        }
+
+        function triggerRender() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = staffSchedule.filter(s => 
+                s.name.toLowerCase().includes(searchTerm) || 
+                s.id.toLowerCase().includes(searchTerm) ||
+                s.code.toLowerCase().includes(searchTerm)
+            );
+            renderTable(filtered);
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            triggerRender();
+        });
+
+        // Initialization trigger
+        window.onload = function() {
+            initializeTable();
+        };
+
+    </script>
+</body>
+</html>
